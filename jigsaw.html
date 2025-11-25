@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <title>LOVE</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://fonts.googleapis.com/css2?family=Mali:wght@400;600&display=swap" rel="stylesheet">
     <style>
         * {
@@ -70,6 +71,8 @@
             overflow: hidden;
             touch-action: none;
             margin: 10px 0;
+            transition: transform 0.1s;
+            /* เพิ่ม transition สำหรับการสลับชิ้นส่วน */
         }
 
         .piece {
@@ -78,19 +81,21 @@
             background-image: url('img/img0004.jpeg');
             /* รูปคู่ของลูกค้า */
             background-size: 300px 300px;
-            cursor: grab;
+            cursor: pointer;
+            /* เปลี่ยนเป็น cursor: pointer สำหรับการแตะ */
             border-radius: 0px;
-            transition: transform 0.1s;
+            transition: outline 0.1s, transform 0.1s;
         }
 
-        .piece:active {
-            cursor: grabbing;
+        /* 🆕 เพิ่มสไตล์สำหรับชิ้นส่วนที่ถูกเลือก (Tap-to-Swap) */
+        .piece.selected {
+            outline: 4px solid #5C3A42;
             transform: scale(1.03);
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
         }
 
-        .piece.over {
-            outline: 3px dashed rgba(232, 108, 141, 0.7);
-        }
+        /* 🗑️ ลบสไตล์ drag/grab ที่ไม่ใช้แล้วออกไป */
+        /* .piece:active, .piece.over ถูกยกเลิกโดยฟังก์ชันใหม่ */
 
         .status {
             font-size: 14px;
@@ -126,7 +131,7 @@
         }
 
         /* ============================
-           Popup ฉลองตอนต่อเสร็จ 🎉
+            Popup ฉลองตอนต่อเสร็จ 🎉
         ============================= */
         .celebrate-overlay {
             position: fixed;
@@ -218,8 +223,7 @@
         }
 
         /* =========================
-           Responsive Add-on
-           ใช้ breakpoints เดียวกับทุกหน้า
+            Responsive Add-on
         ========================= */
 
         /* กันติ่งขอบจอ + ระยะปลอดภัย */
@@ -385,7 +389,7 @@
 
     <div class="card puzzle-wrapper">
         <h1>จิ๊กซอว์รูปของเรา</h1>
-        <p class="subtitle">ลากชิ้นส่วนให้รูปสมบูรณ์</p>
+        <p class="subtitle">แตะชิ้นส่วน 2 ชิ้นเพื่อสลับตำแหน่ง</p>
 
         <div id="puzzle" class="puzzle"></div>
 
@@ -397,7 +401,6 @@
         </div>
     </div>
 
-    <!-- Popup ฉลอง -->
     <div id="celebrate" class="celebrate-overlay">
         <div class="celebrate-box">
             <div class="heart h1">💖</div>
@@ -427,15 +430,21 @@
         const cols = 3;
         let solvedOnce = false; // กัน popup เด้งซ้ำ
 
-        function createPieces(imgSize = 300) {
+        // 🛠️ FIX 1: ดึงขนาดภาพแบบไดนามิกเพื่อให้ backgroundPosition ถูกต้องตามขนาด Responsive
+        function createPieces() {
             puzzle.innerHTML = '';
             const total = rows * cols;
+
+            // ต้องรอให้ CSS คำนวณขนาดของ puzzle เสร็จก่อนจึงจะใช้ offsetWidth ได้
+            // สำหรับโค้ดที่รันตอนโหลดหน้า จะถือว่าขนาดเริ่มต้นถูกต้องตาม CSS แล้ว
+            const imgSize = puzzle.offsetWidth || 300; // ใช้ 300 เป็นค่า fallback
 
             for (let i = 0; i < total; i++) {
                 const piece = document.createElement('div');
                 piece.classList.add('piece');
-                piece.draggable = true;
                 piece.dataset.correctIndex = i; // ตำแหน่งที่ถูกต้อง (0-8)
+
+                // 🗑️ ลบ piece.draggable = true ออก เพื่อใช้ tap-to-swap
 
                 const row = Math.floor(i / cols);
                 const col = i % cols;
@@ -456,8 +465,13 @@
 
             shuffled.forEach(p => puzzle.appendChild(p));
             solvedOnce = false;
-            statusEl.textContent = 'สู้สู้! ';
+            statusEl.textContent = 'สู้สู้! แตะชิ้นส่วน 2 ชิ้นเพื่อสลับกัน';
             celebrate.classList.remove('show');
+            // 📝 ต้องยกเลิกการเลือกชิ้นส่วนหากมีการ Shuffle ใหม่
+            const selected = puzzle.querySelector('.piece.selected');
+            if (selected) {
+                selected.classList.remove('selected');
+            }
         }
 
         function checkSolved() {
@@ -468,50 +482,47 @@
 
             if (solved && !solvedOnce) {
                 solvedOnce = true;
-                statusEl.textContent = 'เรียงถูกแล้วว เก่งมากเลยยย!';
+                statusEl.textContent = 'เรียงถูกแล้วว เก่งมากเลยยยย!';
                 celebrate.classList.add('show'); // เปิด popup ฉลอง
             }
         }
 
-        function enableDragAndDrop() {
-            let dragged = null;
+        // 🛠️ FIX 2: เปลี่ยนจาก Drag and Drop (ลาก/วาง) เป็น Tap-to-Swap (แตะ/สลับ)
+        function enableTapToSwap() {
+            let selectedPiece = null;
 
-            puzzle.addEventListener('dragstart', (e) => {
-                if (!e.target.classList.contains('piece')) return;
-                dragged = e.target;
-                e.dataTransfer.effectAllowed = 'move';
-            });
-
-            puzzle.addEventListener('dragover', (e) => {
-                e.preventDefault();
+            puzzle.addEventListener('click', (e) => {
                 const target = e.target;
-                if (!target.classList.contains('piece') || target === dragged) return;
-                target.classList.add('over');
-            });
+                if (!target.classList.contains('piece')) return;
 
-            puzzle.addEventListener('dragleave', (e) => {
-                if (e.target.classList.contains('piece')) {
-                    e.target.classList.remove('over');
+                if (selectedPiece === null) {
+                    // Step 1: เลือกชิ้นส่วนที่ 1
+                    selectedPiece = target;
+                    selectedPiece.classList.add('selected');
+                    statusEl.textContent = 'เลือกชิ้นที่ 2 เพื่อสลับตำแหน่ง';
+
+                } else if (selectedPiece === target) {
+                    // แตะซ้ำเพื่อยกเลิกการเลือก
+                    selectedPiece.classList.remove('selected');
+                    selectedPiece = null;
+                    statusEl.textContent = 'เริ่มเล่นได้เลย~';
+
+                } else {
+                    // Step 2: สลับชิ้นส่วนที่ 1 กับชิ้นส่วนที่ 2 (target)
+
+                    // Logic การสลับชิ้นส่วนใน DOM:
+                    // ต้องหาตำแหน่งในรายการ (index) เพื่อกำหนดลำดับการสลับที่ถูกต้อง
+                    const selectedNext = selectedPiece.nextSibling === target ? selectedPiece : selectedPiece.nextSibling;
+                    puzzle.insertBefore(selectedPiece, target);
+                    puzzle.insertBefore(target, selectedNext);
+
+                    // ล้างสถานะการเลือก
+                    selectedPiece.classList.remove('selected');
+                    selectedPiece = null;
+                    statusEl.textContent = 'สลับชิ้นส่วนแล้ว! สู้สู้!';
+
+                    checkSolved();
                 }
-            });
-
-            puzzle.addEventListener('drop', (e) => {
-                e.preventDefault();
-                const target = e.target;
-                if (!target.classList.contains('piece') || target === dragged) return;
-
-                target.classList.remove('over');
-
-                const draggedNext = dragged.nextSibling === target ? dragged : dragged.nextSibling;
-                puzzle.insertBefore(dragged, target);
-                puzzle.insertBefore(target, draggedNext);
-
-                checkSolved();
-            });
-
-            puzzle.addEventListener('dragend', () => {
-                dragged = null;
-                Array.from(puzzle.children).forEach(p => p.classList.remove('over'));
             });
         }
 
@@ -520,12 +531,24 @@
             celebrate.classList.remove('show');
         });
 
-        // เรียกใช้งาน
+        // ⚠️ เรียกใช้งานตามลำดับใหม่: สร้างชิ้นส่วน -> เปิดใช้งานการแตะ -> สุ่ม
         createPieces();
-        enableDragAndDrop();
+        enableTapToSwap(); // ใช้งาน Tap-to-Swap แทน Drag and Drop เดิม
         shuffle();
 
         shuffleBtn.addEventListener('click', shuffle);
+
+        // 📢 เพิ่มการสร้างชิ้นส่วนใหม่เมื่อหน้าจอเปลี่ยนขนาด (เพื่อแก้ไข backgroundPosition)
+        window.addEventListener('resize', () => {
+            // หน่วงเวลาเล็กน้อยเพื่อให้แน่ใจว่าการปรับขนาดเสร็จสมบูรณ์
+            setTimeout(() => {
+                // สร้างชิ้นส่วนใหม่ด้วยขนาดภาพที่ถูกต้อง
+                createPieces();
+                // จัดลำดับใหม่ตามลำดับก่อน resize (optional: อาจจะต้อง shuffle ใหม่เพื่อให้เล่นต่อได้)
+                // ในที่นี้เลือกที่จะ shuffle ใหม่เพื่อให้แน่ใจว่าเกมยังเล่นต่อได้
+                shuffle();
+            }, 300);
+        });
     </script>
 </body>
 
