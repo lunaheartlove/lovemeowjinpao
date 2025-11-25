@@ -4,7 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <title>วงล้อตามใจแฟน 🎡</title>
-    <link href="https://fonts.googleapis.com/css2?family=Mali:wght@400;600&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Mali:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -70,8 +71,8 @@
             inset: 0;
             border-radius: 50%;
             border: 4px solid #E86C8D;
-            background:
-                conic-gradient(#FFD6F4 0deg 60deg,
+            /* 6 Segments: 360/6 = 60 องศาต่อชิ้น */
+            background: conic-gradient(#FFD6F4 0deg 60deg,
                     #C8F4FF 60deg 120deg,
                     #FFECC7 120deg 180deg,
                     #FFC2D1 180deg 240deg,
@@ -80,6 +81,8 @@
             box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
             transition: transform 4s cubic-bezier(.17, .67, .35, 1.28);
         }
+
+        /* ลบสไตล์ .segment และ .segment-content ออกตามคำขอ */
 
         .pointer {
             position: absolute;
@@ -92,6 +95,7 @@
             border-right: 14px solid transparent;
             border-bottom: 22px solid #E86C8D;
             filter: drop-shadow(0 3px 4px rgba(0, 0, 0, .18));
+            z-index: 10;
         }
 
         .status {
@@ -132,7 +136,7 @@
         }
 
         /* ============================
-           Popup แบบตัวอย่างที่ต้องการ
+            Popup
         ============================ */
         .result-popup {
             position: fixed;
@@ -237,6 +241,10 @@
             }
         }
 
+
+        /* ============================
+            Responsive Breakpoints
+        ============================ */
 
         /* ---------- โทรศัพท์เล็กมาก (≤ 360px) ---------- */
         @media (max-width: 360px) {
@@ -435,7 +443,8 @@
 
         <div class="wheel-container">
             <div class="pointer"></div>
-            <div id="wheel" class="wheel"></div>
+            <div id="wheel" class="wheel">
+            </div>
         </div>
 
         <div class="status" id="statusText">กด "หมุนวงล้อ" เพื่อเริ่มเล่น</div>
@@ -446,11 +455,9 @@
         </div>
     </div>
 
-    <!-- Popup ผลลัพธ์ -->
     <div id="resultPopup" class="result-popup">
         <div class="result-box">
 
-            <!-- หัวใจตกแต่ง -->
             <div class="h h1">💖</div>
             <div class="h h2">💕</div>
             <div class="h h3">💘</div>
@@ -471,6 +478,7 @@
         const resultPopup = document.getElementById("resultPopup");
         const popupResult = document.getElementById("popupResult");
 
+        // ตัวเลือก (6 ชิ้น)
         const options = [
             'พาไปกินหมูกระทะ',
             'เล่นเกมด้วยกัน',
@@ -483,6 +491,8 @@
         let isSpinning = false;
         let currentRotation = 0;
 
+        // *** ลบฟังก์ชัน createWheelSegments() ออกตามคำขอ ***
+
         spinBtn.addEventListener('click', () => {
             if (isSpinning) return;
             isSpinning = true;
@@ -492,13 +502,19 @@
             const segments = options.length;
             const segmentAngle = 360 / segments;
 
+            // สุ่มตำแหน่งที่จะหยุด (0-5)
             const selectedIndex = Math.floor(Math.random() * segments);
 
+            // 3-5 รอบเต็ม
             const extraTurns = 3 + Math.floor(Math.random() * 3);
+
+            // ตัวชี้ (Pointer) อยู่ที่ 12 นาฬิกา (0 องศา) แต่โค้ดคำนวณจาก 3 นาฬิกา (90 องศา) 
             const pointerAngle = 90;
 
+            // คำนวณจุดกึ่งกลางของชิ้นส่วนที่เลือก
             const targetSegmentCenter = selectedIndex * segmentAngle + segmentAngle / 2;
 
+            // คำนวณการหมุน
             const finalRotation =
                 currentRotation +
                 extraTurns * 360 +
@@ -513,8 +529,13 @@
             const segmentAngle = 360 / segments;
             const pointerAngle = 90;
 
+            // แปลง currentRotation ให้อยู่ในช่วง 0-359 องศา (ทวนเข็มนาฬิกา)
             let normalized = ((currentRotation % 360) + 360) % 360;
+
+            // คำนวณมุมที่ชี้ตรงตัวชี้
             const angleAtPointer = (pointerAngle - normalized + 360) % 360;
+
+            // หา index ของชิ้นส่วนที่ถูกชี้
             const index = Math.floor(angleAtPointer / segmentAngle);
 
             const choice = options[index];
@@ -522,6 +543,7 @@
             // เปิด popup
             popupResult.textContent = choice;
             resultPopup.classList.add("show");
+            statusText.textContent = `ผลลัพธ์คือ: ${choice}!`;
 
             spinBtn.disabled = false;
             isSpinning = false;
@@ -530,6 +552,8 @@
         function closePopup() {
             resultPopup.classList.remove("show");
         }
+
+        // *** ลบ Event Listener สำหรับ resize ออกตามคำขอ ***
     </script>
 
 </body>
